@@ -1,4 +1,6 @@
 use std::cell::RefCell;
+use std::cmp::PartialEq;
+use std::ffi::OsString;
 use std::ops::{Deref, Not};
 use std::rc::Rc;
 use std::time::Duration;
@@ -12,18 +14,26 @@ use glib::{ControlFlow, timeout_add_local};
 use gtk4::{ApplicationWindow, CssProvider, GestureClick};
 use gtk4::prelude::{FixedExt, GtkWindowExt, NativeExt, WidgetExt};
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
+use rand::Rng;
 
 const CHARACTER_SIZE: i32 = 75;
 const FPS: u32 = 4;
 const MOVEMENT_SPEED: u32 = 20;
-const SPRITE_PATH: &str = "./res/pikachu_sprites/";
+
+const EXPLOSION_CHANCE: u8 = 25; // chance of explosion (1/4)
+// later configurable using cli tool
+const SPRITE_PATH: &str = "/home/hannah/Development/Rust/2023_24/chickensoftware/goose/res/pikachu_sprites/";
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum State {
     Stationary,
+
     // special state for initiating run to ensure proper timing
     InitiatingRun,
     Running,
+
+    InitiatingExplosion,
+    Explosion,
 }
 
 impl Not for State {
@@ -31,11 +41,12 @@ impl Not for State {
 
     fn not(self) -> Self::Output {
         match self {
-            State::Running | State::InitiatingRun => State::Stationary,
+            State::Running | State::InitiatingRun | State::InitiatingExplosion | State::Explosion => State::Stationary,
             State::Stationary => State::InitiatingRun,
         }
     }
 }
+
 
 fn activate(application: &gtk4::Application) -> Result<(), glib::Error> {
     let window = ApplicationWindow::new(application);
@@ -56,28 +67,7 @@ fn activate(application: &gtk4::Application) -> Result<(), glib::Error> {
     window.present(); // present prematurely to be able to get screen resolution
 
     if let Some(screen_width) = screen_width(&window) {
-        // Preload images for better performance
-        let mut stationary_sprites = Vec::default();
-        let mut running_sprites = Vec::default();
-
-        for i in 0..4 {
-            stationary_sprites.push(Texture::for_pixbuf(&Pixbuf::from_file(format!(
-                "{}stationary{}.png",
-                SPRITE_PATH, i
-            ))?));
-        }
-        for i in 0..3 {
-            running_sprites.push((
-                Texture::for_pixbuf(&Pixbuf::from_file(format!(
-                    "{}run_left{}.png",
-                    SPRITE_PATH, i
-                ))?),
-                Texture::for_pixbuf(&Pixbuf::from_file(format!(
-                    "{}run_right{}.png",
-                    SPRITE_PATH, i
-                ))?),
-            ));
-        }
+        let (stationary_sprites, running_sprites, explosion_sprites) = preload_images()?;
 
         let fixed = gtk4::Fixed::new();
 
@@ -101,23 +91,43 @@ fn activate(application: &gtk4::Application) -> Result<(), glib::Error> {
 
         // animate character
         timeout_add_local(Duration::from_millis(1000 / FPS as u64), move || {
-            if *(state_clone.borrow().deref()) == State::Stationary {
-                frame = (frame + 1) % stationary_sprites.len();
-                character_clone
-                    .borrow()
-                    .set_paintable(Some(&stationary_sprites[frame]));
-            } else {
-                frame = (frame + 1) % running_sprites.len();
+            let mut state = state_clone.borrow_mut();
+            match state.deref() {
+                State::Stationary => {
+                    frame = (frame + 1) % stationary_sprites.len();
+                    character_clone
+                        .borrow()
+                        .set_paintable(Some(&stationary_sprites[frame]));
+                }
+                State::InitiatingExplosion => {
+                    frame = 0;
+                    *state = State::Explosion;
+                }
+                State::Explosion => {
+                    if frame == explosion_sprites.len() {
+                        *state = State::Stationary;
+                        frame = 0;
+                    } else {
+                        character_clone
+                            .borrow()
+                            .set_paintable(Some(&explosion_sprites[frame]));
 
-                character_clone
-                    .borrow()
-                    .set_paintable(Some(&running_sprites[frame].1));
+                        frame += 1;
+                    }
+                }
+                // Running
+                State::Running | State::InitiatingRun => {
+                    frame = (frame + 1) % running_sprites.len();
 
-                if *(state_clone.borrow().deref()) == State::InitiatingRun {
-                    *(state_clone.borrow_mut()) = State::Running;
+                    character_clone
+                        .borrow()
+                        .set_paintable(Some(&running_sprites[frame]));
+
+                    if state.deref() == &State::InitiatingRun {
+                        *state = State::Running;
+                    }
                 }
             }
-
             ControlFlow::from(true)
         });
 
@@ -131,7 +141,7 @@ fn activate(application: &gtk4::Application) -> Result<(), glib::Error> {
                 if *(state_clone.borrow().deref()) == State::Running {
                     // update position
                     let mut value = x_position_clone.borrow_mut();
-                    *value = (*value + 10.0) % screen_width as f64;
+                    *value = (*value + 10.0) % (screen_width + 10) as f64;
                     // move along screen
                     fixed.move_(character_clone.borrow().deref(), *value, 0.0);
                 }
@@ -144,7 +154,15 @@ fn activate(application: &gtk4::Application) -> Result<(), glib::Error> {
         gesture.connect_pressed(
             move |_gesture: &GestureClick, _n_press: i32, _x: f64, _y: f64| {
                 let mut value = state.borrow_mut();
-                *value = !*value;
+
+                if *value != State::Explosion && *value != State::InitiatingExplosion {
+                    // initiate explosion event
+                    if *value == State::Stationary && (rand::thread_rng().gen_range(0..100) + 1) as u8 <= EXPLOSION_CHANCE {
+                        *value = State::InitiatingExplosion;
+                    } else {
+                        *value = !*value;
+                    }
+                }
             },
         );
 
@@ -157,6 +175,43 @@ fn activate(application: &gtk4::Application) -> Result<(), glib::Error> {
         ))
     }
 }
+
+type Sprites = (Vec<Texture>, Vec<Texture>, Vec<Texture>);
+
+fn preload_images() -> Result<Sprites, glib::Error> {
+    // Preload images for better performance
+    let mut stationary = Vec::default();
+    let mut running = Vec::default();
+    let mut explosion = Vec::default();
+
+    let animations = ["stationary", "run", "explode"];
+    for &animation in &animations {
+        if let Ok(entry) = std::fs::read_dir(format!("{SPRITE_PATH}{animation}")) {
+            let mut files = entry.filter_map(|file| file.ok())
+                .filter(|file| file.metadata().ok().map_or(false, |metadata| metadata.is_file()))
+                .map(|file| file.file_name())
+                .collect::<Vec<OsString>>();
+            files.sort();
+
+            let textures: Result<Vec<Texture>, glib::Error> = files.into_iter()
+                .filter_map(|file_name| file_name.to_str().map(|file_name| format!("{SPRITE_PATH}{animation}/{}", file_name)))
+                .map(|file_path| {
+                    let pixbuf = Pixbuf::from_file(file_path)?;
+                    Ok(Texture::for_pixbuf(&pixbuf))
+                })
+                .collect();
+
+            match animation {
+                "stationary" => stationary = textures?,
+                "run" => running = textures?,
+                "explode" => explosion = textures?,
+                _ => return Err(glib::Error::new(glib::FileError::Failed, "Unexpected animation type")),
+            }
+        }
+    }
+    Ok((stationary, running, explosion))
+}
+
 
 fn screen_width(window: &ApplicationWindow) -> Option<i32> {
     let display = Display::default()?;

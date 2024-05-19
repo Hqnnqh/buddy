@@ -1,253 +1,72 @@
-use std::cell::RefCell;
-use std::cmp::PartialEq;
-use std::ffi::OsString;
-use std::ops::{Deref, Not};
-use std::rc::Rc;
-use std::time::Duration;
-use std::vec::Vec;
+use std::env;
 
-use gdk4::{Display, Texture};
-use gdk4::gdk_pixbuf::Pixbuf;
-use gdk4::prelude::{DisplayExt, MonitorExt};
-use gio::prelude::{ApplicationExt, ApplicationExtManual};
-use glib::{ControlFlow, timeout_add_local};
-use gtk4::{ApplicationWindow, CssProvider, GestureClick};
-use gtk4::prelude::{FixedExt, GtkWindowExt, NativeExt, WidgetExt};
-use gtk4_layer_shell::{Edge, Layer, LayerShell};
-use rand::Rng;
+use clap::Parser;
 
-const CHARACTER_SIZE: i32 = 75;
-const FPS: u32 = 4;
-const MOVEMENT_SPEED: u32 = 20;
+mod render;
 
-const EXPLOSION_CHANCE: u8 = 25; // chance of explosion (1/4)
-// later configurable using cli tool
-const SPRITE_PATH: &str = "/home/hannah/Development/Rust/2023_24/chickensoftware/goose/res/pikachu_sprites/";
+#[derive(Parser)]
+#[command(name = "ChickenBuddy")]
+#[command(author = "Hannah F. <github: Hqnnqh>")]
+#[command(version = "1.0")]
+#[command(about = r#"Your new best buddy when using your computer :)!"#, long_about = None)]
+struct Cli {
+    #[clap(
+        short,
+        long,
+        value_name = "PATH",
+        help = "Initial path to directory with animation sprites. Defaults to environment variable 'CHICKEN_BUDDY_SPRITES_PATH'. Directory must contains subdirectories for each event type."
+    )]
+    sprites_path: Option<String>,
+    #[clap(
+        default_value_t = 75,
+        short,
+        long,
+        value_name = "SIZE",
+        help = "Size of character in pixels (should match animation sprites). Defaults to 75."
+    )]
+    character_size: i32,
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-enum State {
-    Stationary,
+    #[clap(
+        default_value_t = 4,
+        short,
+        long,
+        value_name = "SECONDS",
+        help = "Frames per second to animate character. Defaults to 4."
+    )]
+    fps: u32,
 
-    // special state for initiating run to ensure proper timing
-    InitiatingRun,
-    Running,
-
-    InitiatingExplosion,
-    Explosion,
+    #[clap(
+        default_value_t = 20,
+        short,
+        long,
+        value_name = "SECONDS",
+        help = "Movement speed of character. Defaults to 20."
+    )]
+    movement_speed: u32,
+    #[clap(
+        default_value_t = 15,
+        short,
+        long,
+        value_name = "PERCENT",
+        value_parser = less_than_101,
+        help = "Chance of on-click event occurring. Defaults to 15"
+    )]
+    onclick_event_chance: u8,
 }
+use clap_num::number_range;
 
-impl Not for State {
-    type Output = State;
-
-    fn not(self) -> Self::Output {
-        match self {
-            State::Running | State::InitiatingRun | State::InitiatingExplosion | State::Explosion => State::Stationary,
-            State::Stationary => State::InitiatingRun,
-        }
-    }
-}
-
-
-fn activate(application: &gtk4::Application) -> Result<(), glib::Error> {
-    let window = ApplicationWindow::new(application);
-
-    window.init_layer_shell();
-    // Display above normal windows
-    window.set_layer(Layer::Overlay);
-
-    for (anchor, state) in [
-        (Edge::Left, true),
-        (Edge::Right, true),
-        (Edge::Top, false),
-        (Edge::Bottom, true),
-    ] {
-        window.set_anchor(anchor, state);
-    }
-
-    window.present(); // present prematurely to be able to get screen resolution
-
-    if let Some(screen_width) = screen_width(&window) {
-        let (stationary_sprites, running_sprites, explosion_sprites) = preload_images()?;
-
-        let fixed = gtk4::Fixed::new();
-
-        let character = Rc::new(RefCell::new(gtk4::Image::from_paintable(Some(
-            &stationary_sprites[0],
-        ))));
-        let x_position = Rc::new(RefCell::new(100.0));
-        let state = Rc::new(RefCell::new(State::Stationary));
-
-        character.borrow().set_pixel_size(CHARACTER_SIZE);
-        fixed.put(character.borrow().deref(), *x_position.borrow(), 0.0);
-
-        window.set_child(Some(&fixed));
-        window.set_default_size(CHARACTER_SIZE, CHARACTER_SIZE);
-        window.set_resizable(false);
-
-        let character_clone = Rc::clone(&character);
-        let state_clone = Rc::clone(&state);
-        let x_position_clone = Rc::clone(&x_position);
-        let mut frame = 0;
-
-        // animate character
-        timeout_add_local(Duration::from_millis(1000 / FPS as u64), move || {
-            let mut state = state_clone.borrow_mut();
-            match state.deref() {
-                State::Stationary => {
-                    frame = (frame + 1) % stationary_sprites.len();
-                    character_clone
-                        .borrow()
-                        .set_paintable(Some(&stationary_sprites[frame]));
-                }
-                State::InitiatingExplosion => {
-                    frame = 0;
-                    *state = State::Explosion;
-                }
-                State::Explosion => {
-                    if frame == explosion_sprites.len() {
-                        *state = State::Stationary;
-                        frame = 0;
-                    } else {
-                        character_clone
-                            .borrow()
-                            .set_paintable(Some(&explosion_sprites[frame]));
-
-                        frame += 1;
-                    }
-                }
-                // Running
-                State::Running | State::InitiatingRun => {
-                    frame = (frame + 1) % running_sprites.len();
-
-                    character_clone
-                        .borrow()
-                        .set_paintable(Some(&running_sprites[frame]));
-
-                    if state.deref() == &State::InitiatingRun {
-                        *state = State::Running;
-                    }
-                }
-            }
-            ControlFlow::from(true)
-        });
-
-        let character_clone = Rc::clone(&character);
-        let state_clone = Rc::clone(&state);
-
-        // move character
-        timeout_add_local(
-            Duration::from_millis(1000 / MOVEMENT_SPEED as u64),
-            move || {
-                if *(state_clone.borrow().deref()) == State::Running {
-                    // update position
-                    let mut value = x_position_clone.borrow_mut();
-                    *value = (*value + 10.0) % (screen_width + 10) as f64;
-                    // move along screen
-                    fixed.move_(character_clone.borrow().deref(), *value, 0.0);
-                }
-                ControlFlow::from(true)
-            },
-        );
-
-        // change state of character (stationary/initiating run)
-        let gesture = GestureClick::new();
-        gesture.connect_pressed(
-            move |_gesture: &GestureClick, _n_press: i32, _x: f64, _y: f64| {
-                let mut value = state.borrow_mut();
-
-                if *value != State::Explosion && *value != State::InitiatingExplosion {
-                    // initiate explosion event
-                    if *value == State::Stationary && (rand::thread_rng().gen_range(0..100) + 1) as u8 <= EXPLOSION_CHANCE {
-                        *value = State::InitiatingExplosion;
-                    } else {
-                        *value = !*value;
-                    }
-                }
-            },
-        );
-
-        character.borrow().add_controller(gesture);
-        Ok(())
-    } else {
-        Err(glib::Error::new(
-            glib::FileError::Failed,
-            "Cannot get display resolution!",
-        ))
-    }
-}
-
-type Sprites = (Vec<Texture>, Vec<Texture>, Vec<Texture>);
-
-fn preload_images() -> Result<Sprites, glib::Error> {
-    // Preload images for better performance
-    let mut stationary = Vec::default();
-    let mut running = Vec::default();
-    let mut explosion = Vec::default();
-
-    let animations = ["stationary", "run", "explode"];
-    for &animation in &animations {
-        if let Ok(entry) = std::fs::read_dir(format!("{SPRITE_PATH}{animation}")) {
-            let mut files = entry.filter_map(|file| file.ok())
-                .filter(|file| file.metadata().ok().map_or(false, |metadata| metadata.is_file()))
-                .map(|file| file.file_name())
-                .collect::<Vec<OsString>>();
-            files.sort();
-
-            let textures: Result<Vec<Texture>, glib::Error> = files.into_iter()
-                .filter_map(|file_name| file_name.to_str().map(|file_name| format!("{SPRITE_PATH}{animation}/{}", file_name)))
-                .map(|file_path| {
-                    let pixbuf = Pixbuf::from_file(file_path)?;
-                    Ok(Texture::for_pixbuf(&pixbuf))
-                })
-                .collect();
-
-            match animation {
-                "stationary" => stationary = textures?,
-                "run" => running = textures?,
-                "explode" => explosion = textures?,
-                _ => return Err(glib::Error::new(glib::FileError::Failed, "Unexpected animation type")),
-            }
-        }
-    }
-    Ok((stationary, running, explosion))
-}
-
-
-fn screen_width(window: &ApplicationWindow) -> Option<i32> {
-    let display = Display::default()?;
-
-    let monitor = display.monitor_at_surface(&window.surface()?)?;
-    Some(monitor.geometry().width())
-}
-
-fn load_css() {
-    let provider = CssProvider::new();
-    provider.load_from_string(
-        r#"* {
-        background-color: transparent;
-    }"#,
-    );
-
-    gtk4::style_context_add_provider_for_display(
-        &Display::default().expect("Could not connect to a display."),
-        &provider,
-        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
-    )
+fn less_than_101(s: &str) -> Result<u8, String> {
+    number_range(s, 0, 100)
 }
 
 fn main() {
-    let application =
-        gtk4::Application::new(Some("chickensoftware.hqnnqh.goose"), Default::default());
+    let cli = Cli::parse();
+    let sprites_path = cli.sprites_path.or_else(|| env::var("CHICKEN_BUDDY_SPRITES_PATH").ok());
 
-    application.connect_startup(|_| load_css());
+    if sprites_path.is_none() {
+        eprintln!("Path to directory of animation sprites cannot be found! Try chickenbuddy -h for more information!");
+        return;
+    }
 
-    application.connect_activate(|app| {
-        let result = activate(app);
-
-        if result.is_err() {
-            eprintln!("An error occurred: {:?}", result.err());
-        }
-    });
-
-    application.run();
+    render::render_character(cli.character_size, cli.fps, cli.movement_speed, cli.onclick_event_chance, sprites_path.unwrap());
 }

@@ -61,6 +61,13 @@ fn activate(application: &gtk4::Application, character_size: i32, fps: u32, move
     if let Some(screen_width) = screen_width(&window) {
         let (stationary_sprites, running_sprites, explosion_sprites) = preload_images(sprites_path)?;
 
+        if stationary_sprites.is_empty() || running_sprites.is_empty() || explosion_sprites.is_empty() {
+            return Err(glib::Error::new(
+                glib::FileError::Failed,
+                "Sprites cannot be found!",
+            ));
+        }
+
         let fixed = gtk4::Fixed::new();
 
         let character = Rc::new(RefCell::new(gtk4::Image::from_paintable(Some(
@@ -237,9 +244,9 @@ pub fn render_character(character_size: i32, fps: u32, movement_speed: u32, oncl
         let result = activate(app, character_size, fps, movement_speed, onclick_event_chance, sprites_path.as_str());
 
         if result.is_err() {
-            eprintln!("An error occurred: {:?}", result.err());
+            eprintln!("An error occurred: {:?}", result.err().unwrap().message());
+            std::process::exit(1);
         }
     });
-
-    application.run();
+    application.run_with_args::<&str>(&[]);
 }

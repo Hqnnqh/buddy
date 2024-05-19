@@ -1,6 +1,7 @@
 use std::env;
 
 use clap::Parser;
+use clap_num::number_range;
 
 mod render;
 
@@ -11,7 +12,7 @@ mod render;
 #[command(about = r#"Your new best buddy when using your computer :)!"#, long_about = None)]
 struct Cli {
     #[clap(
-        short,
+        short = 's',
         long,
         value_name = "PATH",
         help = "Initial path to directory with animation sprites. Defaults to environment variable 'CHICKEN_BUDDY_SPRITES_PATH'. Directory must contains subdirectories for each event type."
@@ -22,7 +23,7 @@ struct Cli {
         short,
         long,
         value_name = "SIZE",
-        help = "Size of character in pixels (should match animation sprites). Defaults to 75."
+        help = "Size of character in pixels (should match animation sprites)."
     )]
     character_size: i32,
 
@@ -31,7 +32,7 @@ struct Cli {
         short,
         long,
         value_name = "SECONDS",
-        help = "Frames per second to animate character. Defaults to 4."
+        help = "Frames per second to animate character."
     )]
     fps: u32,
 
@@ -40,7 +41,7 @@ struct Cli {
         short,
         long,
         value_name = "SECONDS",
-        help = "Movement speed of character. Defaults to 20."
+        help = "Movement speed of character."
     )]
     movement_speed: u32,
     #[clap(
@@ -49,11 +50,10 @@ struct Cli {
         long,
         value_name = "PERCENT",
         value_parser = less_than_101,
-        help = "Chance of on-click event occurring. Defaults to 15"
+        help = "Chance of on-click event occurring."
     )]
     onclick_event_chance: u8,
 }
-use clap_num::number_range;
 
 fn less_than_101(s: &str) -> Result<u8, String> {
     number_range(s, 0, 100)
@@ -61,12 +61,11 @@ fn less_than_101(s: &str) -> Result<u8, String> {
 
 fn main() {
     let cli = Cli::parse();
-    let sprites_path = cli.sprites_path.or_else(|| env::var("CHICKEN_BUDDY_SPRITES_PATH").ok());
 
-    if sprites_path.is_none() {
+    if let Some(sprites_path) = cli.sprites_path.or_else(|| env::var("CHICKEN_BUDDY_SPRITES_PATH").ok()) {
+        println!("Initializing Chicken Buddy with character size: {}px, fps: {}s, movement speed: {}fps, on-click event chance: {}%, sprites path: {}.", cli.character_size, cli.fps, cli.movement_speed, cli.onclick_event_chance, &sprites_path);
+        render::render_character(cli.character_size, cli.fps, cli.movement_speed, cli.onclick_event_chance, sprites_path);
+    } else {
         eprintln!("Path to directory of animation sprites cannot be found! Try chickenbuddy -h for more information!");
-        return;
     }
-
-    render::render_character(cli.character_size, cli.fps, cli.movement_speed, cli.onclick_event_chance, sprites_path.unwrap());
 }

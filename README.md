@@ -1,4 +1,4 @@
-# 🐥 Buddy - Your New Best Buddy When Using Your Computer! 🖥️🎉
+# buddy
 
 **Buddy** is here to keep you company while you work on your computer! It’s an animated, interactive little friend that floats around your screen, responding to your clicks and bringing smiles to your day. 😊
 

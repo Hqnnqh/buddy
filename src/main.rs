@@ -6,7 +6,7 @@ use clap_num::number_range;
 mod render;
 
 #[derive(Parser)]
-#[command(name = "ChickenBuddy")]
+#[command(name = "Buddy")]
 #[command(author = "Hannah F. <github: Hqnnqh>")]
 #[command(version = "1.0")]
 #[command(about = r#"Your new best buddy when using your computer :)!"#, long_about = None)]
@@ -15,7 +15,7 @@ struct Cli {
         short = 's',
         long,
         value_name = "PATH",
-        help = "Initial path to directory with animation sprites. Defaults to environment variable 'CHICKEN_BUDDY_SPRITES_PATH'. Directory must contains subdirectories for each event type."
+        help = "Initial path to directory with animation sprites. Defaults to environment variable 'BUDDY_SPRITES_PATH'. Directory must contains subdirectories for each event type."
     )]
     sprites_path: Option<String>,
     #[clap(
@@ -62,10 +62,19 @@ fn less_than_101(s: &str) -> Result<u8, String> {
 fn main() {
     let cli = Cli::parse();
 
-    if let Some(sprites_path) = cli.sprites_path.or_else(|| env::var("CHICKEN_BUDDY_SPRITES_PATH").ok()) {
-        println!("Initializing Chicken Buddy with character size: {}px, fps: {}s, movement speed: {}fps, on-click event chance: {}%, sprites path: {}.", cli.character_size, cli.fps, cli.movement_speed, cli.onclick_event_chance, &sprites_path);
-        render::render_character(cli.character_size, cli.fps, cli.movement_speed, cli.onclick_event_chance, sprites_path);
+    if let Some(sprites_path) = cli
+        .sprites_path
+        .or_else(|| env::var("BUDDY_SPRITES_PATH").ok())
+    {
+        println!("Initializing Buddy with character size: {}px, fps: {}s, movement speed: {}fps, on-click event chance: {}%, sprites path: {}.", cli.character_size, cli.fps, cli.movement_speed, cli.onclick_event_chance, &sprites_path);
+        render::render_character(
+            cli.character_size,
+            cli.fps,
+            cli.movement_speed,
+            cli.onclick_event_chance,
+            sprites_path,
+        );
     } else {
-        eprintln!("Path to directory of animation sprites cannot be found! Try chickenbuddy -h for more information!");
+        eprintln!("Path to directory of animation sprites cannot be found! Try buddy -h for more information!");
     }
 }

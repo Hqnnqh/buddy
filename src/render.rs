@@ -280,10 +280,7 @@ pub fn render_character(
     onclick_event_chance: u8,
     sprites_path: String,
 ) {
-    let application = gtk4::Application::new(
-        Some("chickensoftware.hqnnqh.chickenbuddy"),
-        Default::default(),
-    );
+    let application = gtk4::Application::new(Some("hqnnqh.buddy"), Default::default());
 
     application.connect_startup(|_| load_css());
 

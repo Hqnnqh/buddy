@@ -64,6 +64,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf4b9d6a944f767f8e5e0db018570623c85f3d925ac718db4e06d0187adb21c1"
 
 [[package]]
+name = "buddy"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "clap-num",
+ "gdk4",
+ "gio",
+ "glib",
+ "gtk4",
+ "gtk4-layer-shell",
+ "rand",
+]
+
+[[package]]
 name = "cairo-rs"
 version = "0.19.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -102,20 +116,6 @@ name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
-
-[[package]]
-name = "chickenbuddy"
-version = "0.1.0"
-dependencies = [
- "clap",
- "clap-num",
- "gdk4",
- "gio",
- "glib",
- "gtk4",
- "gtk4-layer-shell",
- "rand",
-]
 
 [[package]]
 name = "clap"

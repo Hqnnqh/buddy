@@ -89,6 +89,9 @@ fn activate(
         let state = Rc::new(RefCell::new(State::Stationary));
 
         character.borrow().set_pixel_size(character_size);
+        character
+            .borrow()
+            .set_margin_start(*x_position.borrow() as i32);
 
         window.set_child(Some(character.borrow().deref()));
         window.set_default_size(character_size, character_size);

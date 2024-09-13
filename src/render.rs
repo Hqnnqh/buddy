@@ -1,7 +1,7 @@
-use std::cell::RefCell;
+use std::cell::Cell;
 use std::cmp::PartialEq;
 use std::ffi::OsString;
-use std::ops::{Deref, Not};
+use std::ops::Not;
 use std::rc::Rc;
 use std::time::Duration;
 use std::vec::Vec;
@@ -82,48 +82,39 @@ fn activate(
             ));
         }
 
-        let character = Rc::new(RefCell::new(gtk4::Image::from_paintable(Some(
-            &stationary_sprites[0],
-        ))));
-        let x_position = Rc::new(RefCell::new(100.0));
-        let state = Rc::new(RefCell::new(State::Stationary));
+        let character = Rc::new(gtk4::Image::from_paintable(Some(&stationary_sprites[0])));
+        let state = Rc::new(Cell::new(State::Stationary));
 
-        character.borrow().set_pixel_size(character_size);
-        character
-            .borrow()
-            .set_margin_start(*x_position.borrow() as i32);
+        character.set_pixel_size(character_size);
 
-        window.set_child(Some(character.borrow().deref()));
+        // default x position of 100
+        character.set_margin_start(100);
+
+        window.set_child(Some(&*character));
         window.set_default_size(character_size, character_size);
         window.set_resizable(false);
 
         let character_clone = Rc::clone(&character);
         let state_clone = Rc::clone(&state);
-        let x_position_clone = Rc::clone(&x_position);
         let mut frame = 0;
 
         // animate character
         timeout_add_local(Duration::from_millis(1000 / fps as u64), move || {
-            let mut state = state_clone.borrow_mut();
-            match state.deref() {
+            match (*state_clone).get() {
                 State::Stationary => {
                     frame = (frame + 1) % stationary_sprites.len();
-                    character_clone
-                        .borrow()
-                        .set_paintable(Some(&stationary_sprites[frame]));
+                    character_clone.set_paintable(Some(&stationary_sprites[frame]));
                 }
                 State::InitiatingExplosion => {
                     frame = 0;
-                    *state = State::Explosion;
+                    state_clone.set(State::Explosion);
                 }
                 State::Explosion => {
                     if frame == explosion_sprites.len() {
-                        *state = State::Stationary;
+                        state_clone.set(State::Stationary);
                         frame = 0;
                     } else {
-                        character_clone
-                            .borrow()
-                            .set_paintable(Some(&explosion_sprites[frame]));
+                        character_clone.set_paintable(Some(&explosion_sprites[frame]));
 
                         frame += 1;
                     }
@@ -132,12 +123,10 @@ fn activate(
                 State::Running | State::InitiatingRun => {
                     frame = (frame + 1) % running_sprites.len();
 
-                    character_clone
-                        .borrow()
-                        .set_paintable(Some(&running_sprites[frame]));
+                    character_clone.set_paintable(Some(&running_sprites[frame]));
 
-                    if state.deref() == &State::InitiatingRun {
-                        *state = State::Running;
+                    if state_clone.get() == State::InitiatingRun {
+                        state_clone.set(State::Running)
                     }
                 }
             }
@@ -151,14 +140,13 @@ fn activate(
         timeout_add_local(
             Duration::from_millis(1000 / movement_speed as u64),
             move || {
-                if *(state_clone.borrow().deref()) == State::Running {
+                if state_clone.get() == State::Running {
                     // update position
-                    let mut value = x_position_clone.borrow_mut();
-                    *value = (*value + 10.0) % (screen_width + 10) as f64;
-                    let character_clone = character_clone.borrow();
+                    let mut value = character_clone.margin_start() as f64;
+                    value = (value + 10.0) % (screen_width + 10) as f64;
                     // move along screen
-                    character_clone.set_margin_start(*value as i32);
-                    update_input_region(&window, character_size, *value, 0.0);
+                    character_clone.set_margin_start(value as i32);
+                    update_input_region(&window, character_size, value, 0.0);
                 }
                 ControlFlow::from(true)
             },
@@ -168,22 +156,20 @@ fn activate(
         let gesture = GestureClick::new();
         gesture.connect_pressed(
             move |_gesture: &GestureClick, _n_press: i32, _x: f64, _y: f64| {
-                let mut value = state.borrow_mut();
-
-                if *value != State::Explosion && *value != State::InitiatingExplosion {
+                if state.get() != State::Explosion && state.get() != State::InitiatingExplosion {
                     // initiate explosion event
-                    if *value == State::Stationary
+                    if state.get() == State::Stationary
                         && (rand::thread_rng().gen_range(0..100) + 1) as u8 <= onclick_event_chance
                     {
-                        *value = State::InitiatingExplosion;
+                        state.set(State::InitiatingExplosion);
                     } else {
-                        *value = !*value;
+                        state.set(!state.get());
                     }
                 }
             },
         );
 
-        character.borrow().add_controller(gesture);
+        character.add_controller(gesture);
         Ok(())
     } else {
         Err(glib::Error::new(

@@ -43,14 +43,17 @@ impl Not for State {
     }
 }
 
-fn activate(
-    application: &gtk4::Application,
-    character_size: i32,
-    fps: u32,
-    movement_speed: u32,
-    onclick_event_chance: u8,
-    sprites_path: &str,
-) -> Result<(), glib::Error> {
+fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib::Error> {
+    let Config {
+        character_size,
+        fps,
+        movement_speed,
+        onclick_event_chance,
+        x,
+        y,
+        ..
+    } = *config;
+
     let window = ApplicationWindow::new(application);
 
     window.init_layer_shell();
@@ -68,9 +71,22 @@ fn activate(
 
     window.present(); // present prematurely to be able to get screen resolution
 
-    if let Some(screen_width) = screen_width(&window) {
+    if let Some((screen_width, screen_height)) = screen_resolution(&window) {
+        // check for valid starting coordinates
+        if (x + character_size as u32) >= screen_width as u32
+            || (y + character_size as u32) >= screen_height as u32
+        {
+            return Err(glib::Error::new(
+                glib::FileError::Failed,
+                format!("Starting coordinates out of bounds: x: {}px, y: {}px for screen width: {}px, screen height: {}px, character size: {}px", x, y, screen_width, screen_height, character_size).as_str(),
+            ));
+        }
+
+        let character_size = character_size as i32;
+        let x = x as i32;
+
         let (stationary_sprites, running_sprites, explosion_sprites) =
-            preload_images(sprites_path)?;
+            preload_images(config.sprites_path.as_str())?;
 
         if stationary_sprites.is_empty()
             || running_sprites.is_empty()
@@ -87,8 +103,9 @@ fn activate(
 
         character.set_pixel_size(character_size);
 
-        // default x position of 100
-        character.set_margin_start(100);
+        // default position
+        character.set_margin_start(x);
+        character.set_margin_bottom(y as i32);
 
         window.set_child(Some(&*character));
         window.set_default_size(character_size, character_size);
@@ -146,7 +163,7 @@ fn activate(
                     value = (value + 10.0) % (screen_width + 10) as f64;
                     // move along screen
                     character_clone.set_margin_start(value as i32);
-                    update_input_region(&window, character_size, value, 0.0);
+                    update_input_region(&window, character_size, value as i32, 0);
                 }
                 ControlFlow::from(true)
             },
@@ -154,6 +171,7 @@ fn activate(
 
         // change state of character (stationary/initiating run)
         let gesture = GestureClick::new();
+
         gesture.connect_pressed(
             move |_gesture: &GestureClick, _n_press: i32, _x: f64, _y: f64| {
                 if state.get() != State::Explosion && state.get() != State::InitiatingExplosion {
@@ -188,7 +206,7 @@ fn preload_images(sprites_path: &str) -> Result<Sprites, glib::Error> {
     let mut explosion = Vec::default();
 
     let animations = ["stationary", "run", "explode"];
-    for &animation in &animations {
+    for animation in animations {
         if let Ok(entry) = std::fs::read_dir(format!("{sprites_path}{animation}")) {
             let mut files = entry
                 .filter_map(|file| file.ok())
@@ -230,21 +248,18 @@ fn preload_images(sprites_path: &str) -> Result<Sprites, glib::Error> {
     Ok((stationary, running, explosion))
 }
 use gdk4::prelude::SurfaceExt;
-fn update_input_region(window: &ApplicationWindow, character_size: i32, x: f64, y: f64) {
-    let region = Region::create_rectangle(&RectangleInt::new(
-        x as i32,
-        y as i32,
-        character_size,
-        character_size,
-    ));
+
+use crate::Config;
+fn update_input_region(window: &ApplicationWindow, character_size: i32, x: i32, y: i32) {
+    let region = Region::create_rectangle(&RectangleInt::new(x, y, character_size, character_size));
     window.surface().unwrap().set_input_region(&region);
 }
-
-fn screen_width(window: &ApplicationWindow) -> Option<i32> {
+/// Returns the screen resolution (width, height). May fail and return None.
+fn screen_resolution(window: &ApplicationWindow) -> Option<(i32, i32)> {
     let display = Display::default()?;
 
     let monitor = display.monitor_at_surface(&window.surface()?)?;
-    Some(monitor.geometry().width())
+    Some((monitor.geometry().width(), monitor.geometry().height()))
 }
 
 fn load_css() {
@@ -262,26 +277,13 @@ fn load_css() {
     )
 }
 
-pub fn render_character(
-    character_size: i32,
-    fps: u32,
-    movement_speed: u32,
-    onclick_event_chance: u8,
-    sprites_path: String,
-) {
+pub fn render_character(config: Config) {
     let application = gtk4::Application::new(Some("hqnnqh.buddy"), Default::default());
 
     application.connect_startup(|_| load_css());
 
     application.connect_activate(move |app| {
-        let result = activate(
-            app,
-            character_size,
-            fps,
-            movement_speed,
-            onclick_event_chance,
-            sprites_path.as_str(),
-        );
+        let result = activate(app, &config);
 
         if result.is_err() {
             eprintln!("An error occurred: {:?}", result.err().unwrap().message());

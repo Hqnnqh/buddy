@@ -41,7 +41,7 @@ You'll get all the help you need to configure your Buddy.
 
 ## Custom Sprites 🎨
 
-Buddy thrives on customization! Just provide a directory containing different subdirectories for each event type (e.g., `idle`, `click`, `run`, etc.), and watch your Buddy come to life with your own animations.
+Buddy thrives on customization! Just provide a directory containing different subdirectories for each event type (`idle`, `click`, `run`), and watch your Buddy come to life with your own animations.
 
 ## Need to Resize Your Sprites? 🔧
 

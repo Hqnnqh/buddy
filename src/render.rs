@@ -19,14 +19,14 @@ use rand::Rng;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum State {
-    Stationary,
+    Idle,
 
     // special state for initiating run to ensure proper timing
     InitiatingRun,
     Running,
 
-    InitiatingExplosion,
-    Explosion,
+    InitiatingClick,
+    Click,
 }
 
 impl Not for State {
@@ -34,11 +34,10 @@ impl Not for State {
 
     fn not(self) -> Self::Output {
         match self {
-            State::Running
-            | State::InitiatingRun
-            | State::InitiatingExplosion
-            | State::Explosion => State::Stationary,
-            State::Stationary => State::InitiatingRun,
+            State::Running | State::InitiatingRun | State::InitiatingClick | State::Click => {
+                State::Idle
+            }
+            State::Idle => State::InitiatingRun,
         }
     }
 }
@@ -85,21 +84,18 @@ fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib
         let character_size = character_size as i32;
         let x = x as i32;
 
-        let (stationary_sprites, running_sprites, explosion_sprites) =
+        let (idle_sprites, running_sprites, click_sprites) =
             preload_images(config.sprites_path.as_str())?;
 
-        if stationary_sprites.is_empty()
-            || running_sprites.is_empty()
-            || explosion_sprites.is_empty()
-        {
+        if idle_sprites.is_empty() || running_sprites.is_empty() || click_sprites.is_empty() {
             return Err(glib::Error::new(
                 glib::FileError::Failed,
                 "Sprites cannot be found!",
             ));
         }
 
-        let character = Rc::new(gtk4::Image::from_paintable(Some(&stationary_sprites[0])));
-        let state = Rc::new(Cell::new(State::Stationary));
+        let character = Rc::new(gtk4::Image::from_paintable(Some(&idle_sprites[0])));
+        let state = Rc::new(Cell::new(State::Idle));
 
         character.set_pixel_size(character_size);
 
@@ -118,20 +114,20 @@ fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib
         // animate character
         timeout_add_local(Duration::from_millis(1000 / fps as u64), move || {
             match (*state_clone).get() {
-                State::Stationary => {
-                    frame = (frame + 1) % stationary_sprites.len();
-                    character_clone.set_paintable(Some(&stationary_sprites[frame]));
+                State::Idle => {
+                    frame = (frame + 1) % idle_sprites.len();
+                    character_clone.set_paintable(Some(&idle_sprites[frame]));
                 }
-                State::InitiatingExplosion => {
+                State::InitiatingClick => {
                     frame = 0;
-                    state_clone.set(State::Explosion);
+                    state_clone.set(State::Click);
                 }
-                State::Explosion => {
-                    if frame == explosion_sprites.len() {
-                        state_clone.set(State::Stationary);
+                State::Click => {
+                    if frame == click_sprites.len() {
+                        state_clone.set(State::Idle);
                         frame = 0;
                     } else {
-                        character_clone.set_paintable(Some(&explosion_sprites[frame]));
+                        character_clone.set_paintable(Some(&click_sprites[frame]));
 
                         frame += 1;
                     }
@@ -169,17 +165,17 @@ fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib
             },
         );
 
-        // change state of character (stationary/initiating run)
+        // change state of character (idle/initiating run)
         let gesture = GestureClick::new();
 
         gesture.connect_pressed(
             move |_gesture: &GestureClick, _n_press: i32, _x: f64, _y: f64| {
-                if state.get() != State::Explosion && state.get() != State::InitiatingExplosion {
-                    // initiate explosion event
-                    if state.get() == State::Stationary
+                if state.get() != State::Click && state.get() != State::InitiatingClick {
+                    // initiate click event
+                    if state.get() == State::Idle
                         && (rand::thread_rng().gen_range(0..100) + 1) as u8 <= onclick_event_chance
                     {
-                        state.set(State::InitiatingExplosion);
+                        state.set(State::InitiatingClick);
                     } else {
                         state.set(!state.get());
                     }
@@ -201,11 +197,11 @@ type Sprites = (Vec<Texture>, Vec<Texture>, Vec<Texture>);
 
 fn preload_images(sprites_path: &str) -> Result<Sprites, glib::Error> {
     // Preload images for better performance
-    let mut stationary = Vec::default();
+    let mut idle = Vec::default();
     let mut running = Vec::default();
-    let mut explosion = Vec::default();
+    let mut click = Vec::default();
 
-    let animations = ["stationary", "run", "explode"];
+    let animations = ["idle", "run", "click"];
     for animation in animations {
         if let Ok(entry) = std::fs::read_dir(format!("{sprites_path}{animation}")) {
             let mut files = entry
@@ -233,9 +229,9 @@ fn preload_images(sprites_path: &str) -> Result<Sprites, glib::Error> {
                 .collect();
 
             match animation {
-                "stationary" => stationary = textures?,
+                "idle" => idle = textures?,
                 "run" => running = textures?,
-                "explode" => explosion = textures?,
+                "click" => click = textures?,
                 _ => {
                     return Err(glib::Error::new(
                         glib::FileError::Failed,
@@ -245,7 +241,7 @@ fn preload_images(sprites_path: &str) -> Result<Sprites, glib::Error> {
             }
         }
     }
-    Ok((stationary, running, explosion))
+    Ok((idle, running, click))
 }
 use gdk4::prelude::SurfaceExt;
 

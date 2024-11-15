@@ -27,6 +27,8 @@ fn main() {
             flip_horizontal: cli.flip_horizontal,
             flip_vertical: cli.flip_vertical,
             debug: cli.debug,
+            signal_frequency: cli.signal_frequency,
+            automatic_reload: cli.automatic_reload,
         });
     } else {
         eprintln!("Path to directory of animation sprites cannot be found! Try buddy -h for more information!");
@@ -47,4 +49,6 @@ pub(crate) struct Config {
     pub(crate) flip_horizontal: bool,
     pub(crate) flip_vertical: bool,
     pub(crate) debug: bool,
+    pub(crate) signal_frequency: u32,
+    pub(crate) automatic_reload: bool,
 }

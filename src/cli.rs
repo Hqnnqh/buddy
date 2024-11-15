@@ -37,9 +37,28 @@ pub(crate) struct Cli {
         short,
         long,
         value_name = "AMOUNT",
-        help = "How often the character's position is updated per second"
+        help = "How often the character's position is updated per second."
     )]
     pub(crate) movement_speed: u32,
+
+    #[clap(
+        default_value_t = 1,
+        short = 'S',
+        long,
+        value_name = "AMOUNT",
+        help = "How often to check for signals per second. Or how often to reload sprites if automatic reload is enabled."
+    )]
+    pub(crate) signal_frequency: u32,
+
+    #[clap(
+        default_value_t = false,
+        short = 'r',
+        long,
+        value_name = "AUTOMATIC-RELOAD",
+        help = "Enables the automatic reload of sprites, the frequency should be specific using -S."
+    )]
+    pub(crate) automatic_reload: bool,
+
     #[clap(
         default_value_t = 15,
         short,

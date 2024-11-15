@@ -12,3 +12,4 @@ glib = "0.19.6"
 rand = "0.8.5"
 clap = { version = "4.5.4", features = ["derive"] }
 clap-num = "1.1.1"
+signal-hook = "0.3.17"

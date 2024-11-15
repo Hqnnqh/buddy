@@ -1,7 +1,11 @@
 use std::cell::Cell;
+use std::cell::RefCell;
 use std::ffi::OsString;
 use std::path::Path;
 use std::rc::Rc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::Duration;
 use std::vec::Vec;
 
@@ -18,7 +22,26 @@ use rand::Rng;
 
 use crate::state::State;
 
-fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib::Error> {
+fn activate(application: &gtk4::Application, config: &Rc<Config>) -> Result<(), glib::Error> {
+    // used to handle signal to reload sprites
+    let reload_sprites = Arc::new(AtomicBool::new(false));
+
+    signal_hook::flag::register(signal_hook::consts::SIGUSR1, Arc::clone(&reload_sprites))
+        .map_err(|err| {
+            glib::Error::new(
+                glib::FileError::Io,
+                format!("Cannot subscribe to signal handler SUGUSR1: {}", err).as_str(),
+            )
+        })?;
+
+    signal_hook::flag::register(signal_hook::consts::SIGUSR2, Arc::clone(&reload_sprites))
+        .map_err(|err| {
+            glib::Error::new(
+                glib::FileError::Io,
+                format!("Cannot subscribe to signal handler SIGUSR2: {}", err).as_str(),
+            )
+        })?;
+
     let Config {
         character_size,
         fps,
@@ -30,8 +53,10 @@ fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib
         flip_horizontal,
         flip_vertical,
         debug,
+        signal_frequency,
+        automatic_reload,
         ..
-    } = *config;
+    } = *config.as_ref();
 
     let window = ApplicationWindow::new(application);
 
@@ -65,22 +90,15 @@ fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib
         let character_size = character_size as i32;
         let x = x as i32;
 
-        let (idle_sprites, running_sprites, click_sprites) = preload_images(
+        let sprites = Rc::new(RefCell::new(preload_images(
             Path::new(config.sprites_path.as_str()),
             flip_horizontal,
             flip_vertical,
-        )?;
+        )?));
 
-        if idle_sprites.is_empty() || running_sprites.is_empty() || click_sprites.is_empty() {
-            return Err(glib::Error::new(
-                glib::FileError::Failed,
-                "Sprites cannot be found!",
-            ));
-        }
-
-        let character = Rc::new(gtk4::Image::from_paintable(Some(&idle_sprites[0])));
+        // start with idle sprites
+        let character = Rc::new(gtk4::Image::from_paintable(Some(&sprites.borrow().0[0])));
         let state = Rc::new(Cell::new(State::Idle));
-
         character.set_pixel_size(character_size);
 
         // default position
@@ -91,36 +109,57 @@ fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib
         window.set_default_size(character_size, character_size);
         window.set_resizable(false);
 
+        let config_clone = Rc::clone(config);
+        let sprites_clone = Rc::clone(&sprites);
+
+        timeout_add_local(
+            Duration::from_millis(1000 / signal_frequency as u64),
+            move || {
+                if automatic_reload || reload_sprites.swap(false, Ordering::Relaxed) {
+                    match preload_images(
+                        Path::new(config_clone.sprites_path.as_str()),
+                        flip_horizontal,
+                        flip_vertical,
+                    ) {
+                        Ok(sprites) => *sprites_clone.borrow_mut() = sprites,
+                        Err(err) => println!("Warning: Could not update sprites: {}", err),
+                    }
+                }
+                ControlFlow::from(true)
+            },
+        );
+
         let character_clone = Rc::clone(&character);
         let state_clone = Rc::clone(&state);
+
         let mut frame = 0;
 
         // animate character
         timeout_add_local(Duration::from_millis(1000 / fps as u64), move || {
             match (*state_clone).get() {
                 State::Idle => {
-                    frame = (frame + 1) % idle_sprites.len();
-                    character_clone.set_paintable(Some(&idle_sprites[frame]));
+                    frame = (frame + 1) % sprites.borrow().0.len();
+                    character_clone.set_paintable(Some(&sprites.borrow().0[frame]));
                 }
                 State::InitiatingClick => {
                     frame = 0;
                     state_clone.set(State::Click);
                 }
                 State::Click => {
-                    if frame == click_sprites.len() {
+                    if frame == sprites.borrow().2.len() {
                         state_clone.set(State::Idle);
                         frame = 0;
                     } else {
-                        character_clone.set_paintable(Some(&click_sprites[frame]));
+                        character_clone.set_paintable(Some(&sprites.borrow().2[frame]));
 
                         frame += 1;
                     }
                 }
                 // Running
                 State::Running | State::InitiatingRun => {
-                    frame = (frame + 1) % running_sprites.len();
+                    frame = (frame + 1) % sprites.borrow().1.len();
 
-                    character_clone.set_paintable(Some(&running_sprites[frame]));
+                    character_clone.set_paintable(Some(&sprites.borrow().1[frame]));
 
                     if state_clone.get() == State::InitiatingRun {
                         state_clone.set(State::Running)
@@ -253,8 +292,17 @@ fn preload_images(
             }
         }
     }
-    Ok((idle, running, click))
+
+    if idle.is_empty() || running.is_empty() || click.is_empty() {
+        Err(glib::Error::new(
+            glib::FileError::Failed,
+            "Sprites cannot be found!",
+        ))
+    } else {
+        Ok((idle, running, click))
+    }
 }
+
 use gdk4::prelude::SurfaceExt;
 
 use crate::Config;
@@ -292,6 +340,7 @@ pub fn render_character(config: Config) {
 
     application.connect_startup(|_| load_css());
 
+    let config = Rc::new(config);
     application.connect_activate(move |app| {
         let result = activate(app, &config);
 

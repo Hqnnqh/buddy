@@ -39,6 +39,16 @@ buddy -h
 ```
 You'll get all the help you need to configure your Buddy.
 
+## Reloading Sprites On-the-Fly
+Want to update Buddy's appearance without restarting the program? Buddy can receive signals to reload the sprites:
+
+```bash
+kill -SIGUSR1 <pid>
+```
+> Send SIGUSR1 or SIGUSR2
+
+Replace <pid> with the process ID of the Buddy instance. This will trigger Buddy to reload the sprite animations dynamically
+
 ## Custom Sprites 🎨
 
 Buddy thrives on customization! Just provide a directory containing different subdirectories for each event type (`idle`, `click`, `run`), and watch your Buddy come to life with your own animations.

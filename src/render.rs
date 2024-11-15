@@ -311,7 +311,9 @@ fn load_css() {
 }
 
 pub fn render_character(config: Config) {
-    let application = gtk4::Application::new(Some("hqnnqh.buddy"), Default::default());
+    let app_id = format!("hqnnqh.buddy.instance{}", std::process::id());
+
+    let application = gtk4::Application::new(Some(app_id.as_str()), Default::default());
 
     application.connect_startup(|_| load_css());
 

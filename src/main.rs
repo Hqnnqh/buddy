@@ -69,6 +69,14 @@ struct Cli {
         help = "Starting position of buddy on y-axis."
     )]
     y: u32,
+    #[clap(
+        default_value_t = false,
+        short,
+        long,
+        value_name = "RUN-LEFT",
+        help = "Make buddy move to the left instead of the default, right"
+    )]
+    left: bool,
 }
 
 fn less_than_101(s: &str) -> Result<u8, String> {
@@ -91,6 +99,7 @@ fn main() {
             sprites_path,
             x: cli.x,
             y: cli.y,
+            left: cli.left,
         });
     } else {
         eprintln!("Path to directory of animation sprites cannot be found! Try buddy -h for more information!");
@@ -107,4 +116,5 @@ pub(crate) struct Config {
     pub(crate) x: u32,
     pub(crate) y: u32,
     pub(crate) sprites_path: String,
+    pub(crate) left: bool,
 }

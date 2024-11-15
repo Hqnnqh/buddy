@@ -50,6 +50,7 @@ fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib
         onclick_event_chance,
         x,
         y,
+        left,
         ..
     } = *config;
 
@@ -155,8 +156,17 @@ fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib
             move || {
                 if state_clone.get() == State::Running {
                     // update position
-                    let mut value = character_clone.margin_start() as f64;
-                    value = (value + 10.0) % (screen_width + 10) as f64;
+                    let value = if left {
+                        let new_position = character_clone.margin_start() - 10;
+                        if new_position <= -(character_size * 2) {
+                            (screen_width + 10) as f64
+                        } else {
+                            new_position as f64
+                        }
+                    } else {
+                        (character_clone.margin_start() as f64 + 10.0)
+                            % (screen_width as f64 + 10.0)
+                    };
                     // move along screen
                     character_clone.set_margin_start(value as i32);
                     update_input_region(&window, character_size, value as i32, 0);

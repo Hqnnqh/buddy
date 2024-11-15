@@ -11,7 +11,7 @@ pub(crate) struct Cli {
         short = 's',
         long,
         value_name = "PATH",
-        help = "Initial path to directory with animation sprites. Defaults to environment variable 'BUDDY_SPRITES_PATH'. Directory must contains subdirectories for each event type."
+        help = "Initial path to directory with animation sprites. Defaults to environment variable 'BUDDY_SPRITES_PATH'. Directory must contain subdirectories for each event type."
     )]
     pub(crate) sprites_path: Option<String>,
     #[clap(
@@ -89,7 +89,7 @@ pub(crate) struct Cli {
         short,
         long,
         value_name = "RUN-LEFT",
-        help = "Make buddy move to the left instead of the default: right"
+        help = "Make buddy move to the left instead of the default: right."
     )]
     pub(crate) left: bool,
     #[clap(

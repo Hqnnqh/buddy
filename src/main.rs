@@ -5,6 +5,7 @@ use cli::Cli;
 
 mod cli;
 mod render;
+mod state;
 
 fn main() {
     let cli = Cli::parse();

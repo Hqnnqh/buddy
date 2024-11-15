@@ -27,7 +27,7 @@ pub(crate) struct Cli {
         default_value_t = 4,
         short,
         long,
-        value_name = "SECONDS",
+        value_name = "AMOUNT",
         help = "Frames per second to animate character."
     )]
     pub(crate) fps: u32,
@@ -36,8 +36,8 @@ pub(crate) struct Cli {
         default_value_t = 20,
         short,
         long,
-        value_name = "SECONDS",
-        help = "Movement speed of character."
+        value_name = "AMOUNT",
+        help = "How often the character's position is updated per second"
     )]
     pub(crate) movement_speed: u32,
     #[clap(
@@ -70,7 +70,7 @@ pub(crate) struct Cli {
         short,
         long,
         value_name = "RUN-LEFT",
-        help = "Make buddy move to the left instead of the default, right"
+        help = "Make buddy move to the left instead of the default: right"
     )]
     pub(crate) left: bool,
     #[clap(

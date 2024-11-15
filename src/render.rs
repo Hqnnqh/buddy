@@ -1,7 +1,5 @@
 use std::cell::Cell;
-use std::cmp::PartialEq;
 use std::ffi::OsString;
-use std::ops::Not;
 use std::path::Path;
 use std::rc::Rc;
 use std::time::Duration;
@@ -18,30 +16,7 @@ use gtk4::{ApplicationWindow, CssProvider, GestureClick};
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
 use rand::Rng;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-enum State {
-    Idle,
-
-    // special state for initiating run to ensure proper timing
-    InitiatingRun,
-    Running,
-
-    InitiatingClick,
-    Click,
-}
-
-impl Not for State {
-    type Output = State;
-
-    fn not(self) -> Self::Output {
-        match self {
-            State::Running | State::InitiatingRun | State::InitiatingClick | State::Click => {
-                State::Idle
-            }
-            State::Idle => State::InitiatingRun,
-        }
-    }
-}
+use crate::state::State;
 
 fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib::Error> {
     let Config {
@@ -320,8 +295,8 @@ pub fn render_character(config: Config) {
     application.connect_activate(move |app| {
         let result = activate(app, &config);
 
-        if result.is_err() {
-            eprintln!("An error occurred: {:?}", result.err().unwrap().message());
+        if let Err(err) = result {
+            eprintln!("An error occurred: {:?}", err.message());
             std::process::exit(1);
         }
     });

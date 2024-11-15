@@ -77,6 +77,22 @@ struct Cli {
         help = "Make buddy move to the left instead of the default, right"
     )]
     left: bool,
+    #[clap(
+        default_value_t = false,
+        short = 'H',
+        long,
+        value_name = "FLIP-HORIZONTAL",
+        help = "Used to flip the horizontal direction of sprites."
+    )]
+    flip_horizontal: bool,
+    #[clap(
+        default_value_t = false,
+        short = 'v',
+        long,
+        value_name = "FLIP-VERTICAL",
+        help = "Used to flip the vertical direction of sprites."
+    )]
+    flip_vertical: bool,
 }
 
 fn less_than_101(s: &str) -> Result<u8, String> {
@@ -100,6 +116,8 @@ fn main() {
             x: cli.x,
             y: cli.y,
             left: cli.left,
+            flip_horizontal: cli.flip_horizontal,
+            flip_vertical: cli.flip_vertical,
         });
     } else {
         eprintln!("Path to directory of animation sprites cannot be found! Try buddy -h for more information!");
@@ -117,4 +135,6 @@ pub(crate) struct Config {
     pub(crate) y: u32,
     pub(crate) sprites_path: String,
     pub(crate) left: bool,
+    pub(crate) flip_horizontal: bool,
+    pub(crate) flip_vertical: bool,
 }

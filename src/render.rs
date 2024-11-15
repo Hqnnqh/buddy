@@ -51,6 +51,8 @@ fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib
         x,
         y,
         left,
+        flip_horizontal,
+        flip_vertical,
         ..
     } = *config;
 
@@ -86,7 +88,7 @@ fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib
         let x = x as i32;
 
         let (idle_sprites, running_sprites, click_sprites) =
-            preload_images(config.sprites_path.as_str())?;
+            preload_images(config.sprites_path.as_str(), flip_horizontal, flip_vertical)?;
 
         if idle_sprites.is_empty() || running_sprites.is_empty() || click_sprites.is_empty() {
             return Err(glib::Error::new(
@@ -205,7 +207,11 @@ fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib
 
 type Sprites = (Vec<Texture>, Vec<Texture>, Vec<Texture>);
 
-fn preload_images(sprites_path: &str) -> Result<Sprites, glib::Error> {
+fn preload_images(
+    sprites_path: &str,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+) -> Result<Sprites, glib::Error> {
     // Preload images for better performance
     let mut idle = Vec::default();
     let mut running = Vec::default();
@@ -233,11 +239,25 @@ fn preload_images(sprites_path: &str) -> Result<Sprites, glib::Error> {
                         .map(|file_name| format!("{sprites_path}{animation}/{}", file_name))
                 })
                 .map(|file_path| {
-                    let pixbuf = Pixbuf::from_file(file_path)?;
+                    let mut pixbuf = Pixbuf::from_file(file_path)?;
+
+                    if flip_horizontal {
+                        pixbuf = pixbuf.flip(true).ok_or(glib::Error::new(
+                            glib::FileError::Failed,
+                            "Could not flip sprites horizontally",
+                        ))?
+                    }
+
+                    if flip_vertical {
+                        pixbuf = pixbuf.flip(false).ok_or(glib::Error::new(
+                            glib::FileError::Failed,
+                            "Could not flip sprites vertically",
+                        ))?
+                    }
+
                     Ok(Texture::for_pixbuf(&pixbuf))
                 })
                 .collect();
-
             match animation {
                 "idle" => idle = textures?,
                 "run" => running = textures?,

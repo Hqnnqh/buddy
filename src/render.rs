@@ -54,6 +54,7 @@ fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib
         left,
         flip_horizontal,
         flip_vertical,
+        debug,
         ..
     } = *config;
 
@@ -76,8 +77,9 @@ fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib
 
     if let Some((screen_width, screen_height)) = screen_resolution(&window) {
         // check for valid starting coordinates
-        if (x + character_size as u32) >= screen_width as u32
-            || (y + character_size as u32) >= screen_height as u32
+        if !debug
+            && ((x + character_size as u32) >= screen_width as u32
+                || (y + character_size as u32) >= screen_height as u32)
         {
             return Err(glib::Error::new(
                 glib::FileError::Failed,

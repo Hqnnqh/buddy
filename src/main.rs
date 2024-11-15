@@ -93,6 +93,14 @@ struct Cli {
         help = "Used to flip the vertical direction of sprites."
     )]
     flip_vertical: bool,
+    #[clap(
+        default_value_t = false,
+        short,
+        long,
+        value_name = "DEBUG-MODE",
+        help = "Used to disable out of bounds checks."
+    )]
+    debug: bool,
 }
 
 fn less_than_101(s: &str) -> Result<u8, String> {
@@ -118,6 +126,7 @@ fn main() {
             left: cli.left,
             flip_horizontal: cli.flip_horizontal,
             flip_vertical: cli.flip_vertical,
+            debug: cli.debug,
         });
     } else {
         eprintln!("Path to directory of animation sprites cannot be found! Try buddy -h for more information!");
@@ -137,4 +146,5 @@ pub(crate) struct Config {
     pub(crate) left: bool,
     pub(crate) flip_horizontal: bool,
     pub(crate) flip_vertical: bool,
+    pub(crate) debug: bool,
 }

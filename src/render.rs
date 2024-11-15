@@ -2,6 +2,7 @@ use std::cell::Cell;
 use std::cmp::PartialEq;
 use std::ffi::OsString;
 use std::ops::Not;
+use std::path::Path;
 use std::rc::Rc;
 use std::time::Duration;
 use std::vec::Vec;
@@ -87,8 +88,11 @@ fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib
         let character_size = character_size as i32;
         let x = x as i32;
 
-        let (idle_sprites, running_sprites, click_sprites) =
-            preload_images(config.sprites_path.as_str(), flip_horizontal, flip_vertical)?;
+        let (idle_sprites, running_sprites, click_sprites) = preload_images(
+            Path::new(config.sprites_path.as_str()),
+            flip_horizontal,
+            flip_vertical,
+        )?;
 
         if idle_sprites.is_empty() || running_sprites.is_empty() || click_sprites.is_empty() {
             return Err(glib::Error::new(
@@ -208,7 +212,7 @@ fn activate(application: &gtk4::Application, config: &Config) -> Result<(), glib
 type Sprites = (Vec<Texture>, Vec<Texture>, Vec<Texture>);
 
 fn preload_images(
-    sprites_path: &str,
+    sprites_path: &Path,
     flip_horizontal: bool,
     flip_vertical: bool,
 ) -> Result<Sprites, glib::Error> {
@@ -219,7 +223,8 @@ fn preload_images(
 
     let animations = ["idle", "run", "click"];
     for animation in animations {
-        if let Ok(entry) = std::fs::read_dir(format!("{sprites_path}{animation}")) {
+        let animation_path = sprites_path.join(animation);
+        if let Ok(entry) = std::fs::read_dir(&animation_path) {
             let mut files = entry
                 .filter_map(|file| file.ok())
                 .filter(|file| {
@@ -236,7 +241,7 @@ fn preload_images(
                 .filter_map(|file_name| {
                     file_name
                         .to_str()
-                        .map(|file_name| format!("{sprites_path}{animation}/{}", file_name))
+                        .map(|file_name| animation_path.join(file_name))
                 })
                 .map(|file_path| {
                     let mut pixbuf = Pixbuf::from_file(file_path)?;

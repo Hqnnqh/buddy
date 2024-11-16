@@ -18,7 +18,7 @@ To run Buddy, you’ll need the following:
 sudo apt install libgtk-4-dev
 ```
 
-## Installation ⚙️
+## Installation 🚀
 1. Clone the repository to your local machine:
 
   ```bash
@@ -48,6 +48,18 @@ kill -SIGUSR1 <pid>
 > Send SIGUSR1 or SIGUSR2
 
 Replace <pid> with the process ID of the Buddy instance. This will trigger Buddy to reload the sprite animations dynamically
+
+## Configuration ⚙️
+Buddy creates a default configuration file upon its first run. This file is located at:
+
+```bash
+~/.config/buddy/config.toml
+```
+
+### Default Configuration File
+The configuration file includes all necessary settings to customize your Buddy's behavior and appearance. However, for Buddy to function, **you must specify a valid sprite path**:
+1. Using **command-line arguments**
+2. Adding the sprite path to the **configuration file**
 
 ## Custom Sprites 🎨
 

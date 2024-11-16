@@ -78,8 +78,10 @@ fn activate(application: &gtk4::Application, config: &Rc<Config>) -> Result<(), 
     if let Some((screen_width, screen_height)) = screen_resolution(&window) {
         // check for valid starting coordinates
         if !debug
-            && ((x + character_size as u32) >= screen_width as u32
-                || (y + character_size as u32) >= screen_height as u32)
+            && ((x + character_size as i32) >= screen_width
+                || x < 0
+                || (y + character_size as i32) >= screen_height
+                || y < 0)
         {
             return Err(glib::Error::new(
                 glib::FileError::Failed,
@@ -88,7 +90,6 @@ fn activate(application: &gtk4::Application, config: &Rc<Config>) -> Result<(), 
         }
 
         let character_size = character_size as i32;
-        let x = x as i32;
 
         let sprites = Rc::new(RefCell::new(preload_images(
             Path::new(config.sprites_path.as_str()),
@@ -103,7 +104,7 @@ fn activate(application: &gtk4::Application, config: &Rc<Config>) -> Result<(), 
 
         // default position
         character.set_margin_start(x);
-        character.set_margin_bottom(y as i32);
+        character.set_margin_bottom(y);
 
         window.set_child(Some(&*character));
         window.set_default_size(character_size, character_size);

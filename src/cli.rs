@@ -75,7 +75,7 @@ pub(crate) struct Cli {
         value_name = "X-START",
         help = "Starting position of buddy on x-axis."
     )]
-    pub(crate) x: u32,
+    pub(crate) x: i32,
     #[clap(
         default_value_t = 0,
         short,
@@ -83,7 +83,7 @@ pub(crate) struct Cli {
         value_name = "Y-START",
         help = "Starting position of buddy on y-axis."
     )]
-    pub(crate) y: u32,
+    pub(crate) y: i32,
     #[clap(
         default_value_t = false,
         short,

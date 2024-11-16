@@ -22,7 +22,11 @@ use rand::Rng;
 
 use crate::state::State;
 
-fn activate(application: &gtk4::Application, config: &Rc<Config>) -> Result<(), glib::Error> {
+fn activate(
+    application: &gtk4::Application,
+    config: &Config,
+    sprites_path: &Rc<String>,
+) -> Result<(), glib::Error> {
     // used to handle signal to reload sprites
     let reload_sprites = Arc::new(AtomicBool::new(false));
 
@@ -56,7 +60,7 @@ fn activate(application: &gtk4::Application, config: &Rc<Config>) -> Result<(), 
         signal_frequency,
         automatic_reload,
         ..
-    } = *config.as_ref();
+    } = *config;
 
     let window = ApplicationWindow::new(application);
 
@@ -92,13 +96,15 @@ fn activate(application: &gtk4::Application, config: &Rc<Config>) -> Result<(), 
         let character_size = character_size as i32;
 
         let sprites = Rc::new(RefCell::new(preload_images(
-            Path::new(config.sprites_path.as_str()),
+            Path::new(sprites_path.as_str()),
             flip_horizontal,
             flip_vertical,
         )?));
 
         // start with idle sprites
-        let character = Rc::new(gtk4::Image::from_paintable(Some(&sprites.borrow().0[0])));
+        let character = Rc::new(gtk4::Image::from_paintable(Some(
+            &sprites.as_ref().borrow().0[0],
+        )));
         let state = Rc::new(Cell::new(State::Idle));
         character.set_pixel_size(character_size);
 
@@ -110,15 +116,14 @@ fn activate(application: &gtk4::Application, config: &Rc<Config>) -> Result<(), 
         window.set_default_size(character_size, character_size);
         window.set_resizable(false);
 
-        let config_clone = Rc::clone(config);
         let sprites_clone = Rc::clone(&sprites);
-
+        let sprites_path_clone = Rc::clone(sprites_path);
         timeout_add_local(
             Duration::from_millis(1000 / signal_frequency as u64),
             move || {
                 if automatic_reload || reload_sprites.swap(false, Ordering::Relaxed) {
                     match preload_images(
-                        Path::new(config_clone.sprites_path.as_str()),
+                        Path::new(sprites_path_clone.as_str()),
                         flip_horizontal,
                         flip_vertical,
                     ) {
@@ -139,28 +144,28 @@ fn activate(application: &gtk4::Application, config: &Rc<Config>) -> Result<(), 
         timeout_add_local(Duration::from_millis(1000 / fps as u64), move || {
             match (*state_clone).get() {
                 State::Idle => {
-                    frame = (frame + 1) % sprites.borrow().0.len();
-                    character_clone.set_paintable(Some(&sprites.borrow().0[frame]));
+                    frame = (frame + 1) % sprites.as_ref().borrow().0.len();
+                    character_clone.set_paintable(Some(&sprites.as_ref().borrow().0[frame]));
                 }
                 State::InitiatingClick => {
                     frame = 0;
                     state_clone.set(State::Click);
                 }
                 State::Click => {
-                    if frame == sprites.borrow().2.len() {
+                    if frame == sprites.as_ref().borrow().2.len() {
                         state_clone.set(State::Idle);
                         frame = 0;
                     } else {
-                        character_clone.set_paintable(Some(&sprites.borrow().2[frame]));
+                        character_clone.set_paintable(Some(&sprites.as_ref().borrow().2[frame]));
 
                         frame += 1;
                     }
                 }
                 // Running
                 State::Running | State::InitiatingRun => {
-                    frame = (frame + 1) % sprites.borrow().1.len();
+                    frame = (frame + 1) % sprites.as_ref().borrow().1.len();
 
-                    character_clone.set_paintable(Some(&sprites.borrow().1[frame]));
+                    character_clone.set_paintable(Some(&sprites.as_ref().borrow().1[frame]));
 
                     if state_clone.get() == State::InitiatingRun {
                         state_clone.set(State::Running)
@@ -334,16 +339,17 @@ fn load_css() {
     )
 }
 
-pub fn render_character(config: Config) {
+pub fn render_character(config: Config, sprites_path: String) {
     let app_id = format!("hqnnqh.buddy.instance{}", std::process::id());
 
     let application = gtk4::Application::new(Some(app_id.as_str()), Default::default());
 
     application.connect_startup(|_| load_css());
 
-    let config = Rc::new(config);
+    let sprites_path = Rc::new(sprites_path);
+
     application.connect_activate(move |app| {
-        let result = activate(app, &config);
+        let result = activate(app, &config, &sprites_path);
 
         if let Err(err) = result {
             eprintln!("An error occurred: {:?}", err.message());

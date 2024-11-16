@@ -9,7 +9,15 @@ gtk4-layer-shell = "0.3.0"
 gio = "0.19.5"
 gdk4 = "0.8.2"
 glib = "0.19.6"
+
 rand = "0.8.5"
+
 clap = { version = "4.5.4", features = ["derive"] }
 clap-num = "1.1.1"
+
 signal-hook = "0.3.17"
+
+serde = "1.0.215"
+serde_derive = "1.0.215"
+confy = "0.6.1"
+regex = "1.11.1"

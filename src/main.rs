@@ -1,54 +1,80 @@
 use std::env;
 
 use clap::Parser;
-use cli::Cli;
+use config::{cli::Cli, Config};
+use confy::ConfyError;
+use regex::Regex;
 
-mod cli;
+mod config;
 mod render;
 mod state;
 
+/// Parse cli args and match against config file
+macro_rules! parse_args {
+    ($config:expr, $cli:expr, $($field:ident),*) => {{
+        $(
+            if let Some(value) = $cli.$field {
+                $config.$field = value.into();
+            }
+        )*
+    }};
+}
 fn main() {
     let cli = Cli::parse();
 
-    if let Some(sprites_path) = cli
+    // load specific config file or default path.
+    let config: Result<Config, ConfyError> = match cli.config_path {
+        Some(config_path) => confy::load_path(config_path),
+        None => confy::load("buddy", Option::from("config")),
+    };
+
+    let mut config = match config {
+        Ok(config) => config,
+        Err(err) => {
+            eprintln!("Configuration Error: {}", err);
+            return;
+        }
+    };
+
+    parse_args!(
+        config,
+        cli,
+        sprites_path,
+        character_size,
+        fps,
+        movement_speed,
+        signal_frequency,
+        automatic_reload,
+        onclick_event_chance,
+        x,
+        y,
+        left,
+        flip_horizontal,
+        flip_vertical,
+        debug
+    );
+
+    // check for existing sprites path
+    let sprites_path = match config
         .sprites_path
-        .or_else(|| env::var("BUDDY_SPRITES_PATH").ok())
+        .take()
+        .and_then(|path| expand_env(path.replace("~", "$HOME")))
     {
-        println!("Initializing Buddy with character size: {}px, fps: {}s, movement speed: {}fps, on-click event chance: {}%, sprites path: {}, x-start: {}, y-start: {}.", cli.character_size, cli.fps, cli.movement_speed, cli.onclick_event_chance, &sprites_path, cli.x, cli.y);
-        render::render_character(Config {
-            character_size: cli.character_size,
-            fps: cli.fps,
-            movement_speed: cli.movement_speed,
-            onclick_event_chance: cli.onclick_event_chance,
-            sprites_path,
-            x: cli.x,
-            y: cli.y,
-            left: cli.left,
-            flip_horizontal: cli.flip_horizontal,
-            flip_vertical: cli.flip_vertical,
-            debug: cli.debug,
-            signal_frequency: cli.signal_frequency,
-            automatic_reload: cli.automatic_reload,
-        });
-    } else {
-        eprintln!("Path to directory of animation sprites cannot be found! Try buddy -h for more information!");
-    }
+        Some(sprites_path) => sprites_path,
+        None => {
+            eprintln!("No sprites path provided!");
+            return;
+        }
+    };
+
+    render::render_character(config, sprites_path);
 }
 
-#[derive(Clone, Debug)]
-pub(crate) struct Config {
-    // can safely be casted as both i32 and u32
-    pub(crate) character_size: u16,
-    pub(crate) fps: u32,
-    pub(crate) movement_speed: u32,
-    pub(crate) onclick_event_chance: u8,
-    pub(crate) x: i32,
-    pub(crate) y: i32,
-    pub(crate) sprites_path: String,
-    pub(crate) left: bool,
-    pub(crate) flip_horizontal: bool,
-    pub(crate) flip_vertical: bool,
-    pub(crate) debug: bool,
-    pub(crate) signal_frequency: u32,
-    pub(crate) automatic_reload: bool,
+fn expand_env(input: String) -> Option<String> {
+    Regex::new(r"\$([A-Za-z_][A-Za-z0-9_]*)").ok().map(|re| {
+        re.replace_all(&input, |caps: &regex::Captures| {
+            env::var(&caps[1]).unwrap_or_else(|_| format!("${}", &caps[1]))
+        })
+        .to_string()
+    })
 }

@@ -1,5 +1,6 @@
 use std::ops::Not;
 
+/// State that buddy can be in at any time.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum State {
     Idle,

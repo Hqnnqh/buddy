@@ -16,7 +16,7 @@ macro_rules! parse_args {
     }};
 }
 
-/// Parse [Cli](crate::config::cli::Cli) and config arguments. Returns [Config](crate::config::Config) structure and sprites path. [BuddyError](crate::error::BuddyError) is returned in case of failirue (invalid config, invalid sprites path).
+/// Parse [Cli] and config arguments. Returns [Config] structure and sprites path. [BuddyError] is returned in case of failirue (invalid config, invalid sprites path).
 ///
 /// Note: sprites path in config structure remains None.
 pub(crate) fn run() -> Result<(Config, String), BuddyError> {

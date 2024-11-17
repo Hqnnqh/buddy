@@ -26,6 +26,7 @@ mod helpers;
 mod sprite;
 mod state;
 
+/// Prepare and render character.
 pub(crate) fn render_character(config: Config, sprites_path: String) {
     let app_id = format!("hqnnqh.buddy.instance{}", std::process::id());
 
@@ -46,6 +47,7 @@ pub(crate) fn render_character(config: Config, sprites_path: String) {
     application.run_with_args::<&str>(&[]);
 }
 
+/// Active GTK app. May fail and return [BuddyError].
 fn activate(
     application: &gtk4::Application,
     config: &Config,

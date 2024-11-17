@@ -5,8 +5,10 @@ use gdk4::{gdk_pixbuf::Pixbuf, Texture};
 
 use crate::error::BuddyError;
 
+/// Animation sprites
 pub(super) type Sprites = (Vec<Texture>, Vec<Texture>, Vec<Texture>);
 
+/// (Pre-)load the images for better preformance. May fail and return [BuddyError].
 pub(super) fn preload_images(
     sprites_path: &Path,
     flip_horizontal: bool,

@@ -139,6 +139,9 @@ fn activate(
     window.set_default_size(character_size, character_size);
     window.set_resizable(false);
 
+    // default input region
+    update_input_region(&window, character_size, x, 0);
+
     let sprites_clone = Rc::clone(&sprites);
     let sprites_path_clone = Rc::clone(sprites_path);
 

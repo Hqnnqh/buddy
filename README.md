@@ -2,6 +2,8 @@
 
 **Buddy** is here to keep you company while you work on your computer! It’s an animated, interactive little friend that floats around your screen, responding to your clicks and bringing smiles to your day. 😊
 
+![](res/example.gif)
+
 ## Features 🌟
 - **Interactive Animations**: Your Buddy reacts to clicks and moves around on the screen.
 - **Custom Sprites**: Load your own sprites for animations! Buddy adapts to any character you want.

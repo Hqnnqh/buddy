@@ -8,7 +8,7 @@ pub(crate) enum BuddyError {
     #[error("No sprites path specidied")]
     NoSprites,
     #[error("Graphical Failure: {0}")]
-    Glib(#[from] glib::Error),
+    Glib(#[from] gio::glib::Error),
     #[error("Signal Subscription Failed: {0}")]
     SignalSubscriptionFailed(#[from] std::io::Error),
     #[error("Coordinates out of bounds: x: {0}px, y: {1}px for screen width: {2}px, screen height: {3}px, character size: {4}px - Use debug flag to disable bounds-checking")]

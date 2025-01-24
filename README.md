@@ -16,7 +16,7 @@ sudo apt install libgtk-4-dev
 1. Clone the repository to your local machine:
 
   ```bash
-  git clone https://github.com/Hqnnqh/buddy.git
+  git clone https://github.com/hannahfluch/buddy.git
   cd buddy
   ```
 
